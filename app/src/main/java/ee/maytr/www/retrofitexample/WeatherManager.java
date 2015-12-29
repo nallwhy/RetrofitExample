@@ -3,6 +3,12 @@ package ee.maytr.www.retrofitexample;
 import android.content.Context;
 import android.widget.Toast;
 
+import com.squareup.okhttp.HttpUrl;
+import com.squareup.okhttp.Interceptor;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+
+import java.io.IOException;
 import java.util.HashMap;
 
 import retrofit.Call;
@@ -24,13 +30,27 @@ public class WeatherManager {
 
     public WeatherManager(Context context) {
         this.context = context;
-        this.retrofit = new Retrofit.Builder().addConverterFactory(GsonConverterFactory.create()).baseUrl("http://api.openweathermap.org/data/2.5/").build();
+
+        OkHttpClient client = new OkHttpClient();
+        client.interceptors().add(new Interceptor() {
+            @Override
+            public com.squareup.okhttp.Response intercept(Chain chain) throws IOException {
+                Request request = chain.request();
+                HttpUrl url = request.httpUrl().newBuilder()
+                        .addQueryParameter("APPID", "")
+                        .build();
+                Request newRequest = chain.request().newBuilder().url(url).build();
+                return chain.proceed(newRequest);
+            }
+        });
+
+        this.retrofit = new Retrofit.Builder().addConverterFactory(GsonConverterFactory.create()).baseUrl("http://api.openweathermap.org/data/2.5/").client(client).build();
         this.weatherService = retrofit.create(WeatherService.class);
     }
 
     public interface WeatherService {
         @POST("weather")
-        Call<Dummy> getWeather(@Query("q") String city, @Query("APPID") String api_key);
+        Call<Dummy> getWeather(@Query("q") String city);
     }
 
     Callback<Dummy> weatherCallback = new Callback<Dummy>() {
@@ -46,7 +66,7 @@ public class WeatherManager {
     };
 
     public void getWeather() {
-        Call<Dummy> call = weatherService.getWeather("London", "");
+        Call<Dummy> call = weatherService.getWeather("London");
         call.enqueue(weatherCallback);
     }
 
